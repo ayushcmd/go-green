@@ -7,7 +7,14 @@ node_modules/
 dist/
 dist-ssr/
 build/
+bin/
+obj/
 *.local
+native/build/
+native/**/build/
+*.o
+*.a
+*.so
 
 # Testing and coverage
 coverage/

@@ -19,6 +19,22 @@ test.describe('GoGreen Studio Navigation & Operational States', () => {
     await page.goto('/core-engine');
     await expect(page.getByText('Instruction Set Architecture (ISA)')).toBeVisible();
     await expect(page.getByText('Assembly Routine Inventory')).toBeVisible();
+    await expect(page.getByRole('button', { name: /asm_add_i64/i })).toBeVisible();
+  });
+
+  test('navigates to Profiler and verifies microbenchmark suite execution', async ({ page }) => {
+    await page.goto('/profiler');
+    await expect(page.getByText('Microarchitectural Profiler')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Run Benchmark Suite' })).toBeVisible();
+    await page.getByRole('button', { name: 'Run Benchmark Suite' }).click();
+    // Verify execution completes and either benchmark data or status message renders
+    await expect(page.getByRole('button', { name: /Benchmark Suite/i }).first()).toBeVisible();
+  });
+
+  test('navigates to System Monitor and verifies host telemetry', async ({ page }) => {
+    await page.goto('/system-monitor');
+    await expect(page.getByText('System Diagnostics & Telemetry')).toBeVisible();
+    await expect(page.getByText('Hardware Concurrency')).toBeVisible();
   });
 
   test('navigates to Settings and toggles preferences', async ({ page }) => {

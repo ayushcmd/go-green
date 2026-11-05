@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { StatusIndicator } from '@/components/ui/StatusIndicator';
@@ -14,11 +14,75 @@ import {
   ArrowUpRight,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { getHostHardwareInfo, systemLogsSeed } from '@/services/systemService';
+import {
+  getHostHardwareInfo,
+  systemLogsSeed,
+  fetchNativeHealth,
+  fetchNativeHost,
+  fetchNativeCpu,
+  fetchNativeTelemetry,
+} from '@/services/systemService';
+import {
+  NativeDaemonHealth,
+  NativeHostInfo,
+  NativeCpuInfo,
+  NativeTelemetrySnapshot,
+} from '@/types';
 
 export const OverviewPage: React.FC = () => {
   const navigate = useNavigate();
   const host = getHostHardwareInfo();
+
+  const [daemonHealth, setDaemonHealth] = useState<NativeDaemonHealth | null>(null);
+  const [nativeHost, setNativeHost] = useState<NativeHostInfo | null>(null);
+  const [nativeCpu, setNativeCpu] = useState<NativeCpuInfo | null>(null);
+  const [telemetry, setTelemetry] = useState<NativeTelemetrySnapshot | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const pollDaemon = async () => {
+      const healthRes = await fetchNativeHealth();
+      if (!mounted) return;
+
+      if (healthRes.connected && healthRes.data) {
+        setIsConnected(true);
+        setDaemonHealth(healthRes.data);
+
+        const [hostData, cpuData, telemData] = await Promise.all([
+          fetchNativeHost(),
+          fetchNativeCpu(),
+          fetchNativeTelemetry(),
+        ]);
+
+        if (!mounted) return;
+        if (hostData) setNativeHost(hostData);
+        if (cpuData) setNativeCpu(cpuData);
+        if (telemData) setTelemetry(telemData);
+      } else {
+        setIsConnected(false);
+        setDaemonHealth(null);
+        setNativeHost(null);
+        setNativeCpu(null);
+        setTelemetry(null);
+      }
+    };
+
+    pollDaemon();
+    const interval = setInterval(pollDaemon, 3000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const ramUsedGb = telemetry
+    ? (telemetry.system.memory.used_bytes / (1024 * 1024 * 1024)).toFixed(2)
+    : null;
+  const ramTotalGb = telemetry
+    ? (telemetry.system.memory.total_bytes / (1024 * 1024 * 1024)).toFixed(2)
+    : null;
 
   return (
     <div className="space-y-6">
@@ -31,20 +95,22 @@ export const OverviewPage: React.FC = () => {
               <div className="text-[11px] font-mono text-gogreen-text-secondary uppercase">
                 Platform Gateway
               </div>
-              <div className="text-lg font-mono font-bold text-gogreen-text-primary mt-1">
-                STANDBY
+              <div className={`text-lg font-mono font-bold mt-1 ${isConnected ? 'text-gogreen-bright' : 'text-gogreen-text-primary'}`}>
+                {isConnected ? 'ONLINE' : 'STANDBY'}
               </div>
               <div className="text-[11px] text-gogreen-text-secondary mt-0.5">
-                Waiting for host daemon link
+                {isConnected ? `Daemon v${daemonHealth?.engine_version || '2.0.0'}` : 'Waiting for host daemon link'}
               </div>
             </div>
             <div className="p-3 bg-gogreen-bg-elevated border border-gogreen-border rounded">
-              <Radio className="w-5 h-5 text-gogreen-warning" />
+              <Radio className={`w-5 h-5 ${isConnected ? 'text-gogreen-bright' : 'text-gogreen-warning'}`} />
             </div>
           </div>
           <div className="px-4 py-2 bg-gogreen-bg-secondary/40 border-t border-gogreen-border/60 flex items-center justify-between text-[11px] font-mono">
             <span className="text-gogreen-text-secondary">Host Binding</span>
-            <span className="text-gogreen-text-primary">127.0.0.1:8080</span>
+            <span className={isConnected ? 'text-gogreen-bright font-semibold' : 'text-gogreen-text-primary'}>
+              127.0.0.1:8080 {isConnected && '• ACTIVE'}
+            </span>
           </div>
         </Card>
 
@@ -55,20 +121,22 @@ export const OverviewPage: React.FC = () => {
               <div className="text-[11px] font-mono text-gogreen-text-secondary uppercase">
                 Native Engine
               </div>
-              <div className="text-lg font-mono font-bold text-gogreen-text-secondary mt-1">
-                NOT CONNECTED
+              <div className={`text-lg font-mono font-bold mt-1 ${isConnected ? 'text-gogreen-bright' : 'text-gogreen-text-secondary'}`}>
+                {isConnected ? 'ONLINE' : 'NOT CONNECTED'}
               </div>
-              <div className="text-[11px] text-gogreen-text-secondary mt-0.5">
-                IPC socket offline
+              <div className="text-[11px] text-gogreen-text-secondary mt-0.5 truncate max-w-[150px]">
+                {isConnected ? (nativeCpu?.vendor || 'C++23 Native Core') : 'IPC socket offline'}
               </div>
             </div>
             <div className="p-3 bg-gogreen-bg-elevated border border-gogreen-border rounded">
-              <Cpu className="w-5 h-5 text-gogreen-text-secondary" />
+              <Cpu className={`w-5 h-5 ${isConnected ? 'text-gogreen-bright' : 'text-gogreen-text-secondary'}`} />
             </div>
           </div>
           <div className="px-4 py-2 bg-gogreen-bg-secondary/40 border-t border-gogreen-border/60 flex items-center justify-between text-[11px] font-mono">
             <span className="text-gogreen-text-secondary">Target Architecture</span>
-            <span className="text-gogreen-bright font-semibold uppercase">{host.arch}</span>
+            <span className="text-gogreen-bright font-semibold uppercase">
+              {nativeCpu?.architecture || host.arch}
+            </span>
           </div>
         </Card>
 
@@ -104,10 +172,10 @@ export const OverviewPage: React.FC = () => {
                 Hardware Host
               </div>
               <div className="text-lg font-mono font-bold text-gogreen-text-primary mt-1">
-                {host.cores} CORES
+                {nativeCpu ? `${nativeCpu.physical_cores}P / ${nativeCpu.logical_cores}L` : `${host.cores} CORES`}
               </div>
-              <div className="text-[11px] text-gogreen-text-secondary mt-0.5">
-                Logical execution threads
+              <div className="text-[11px] text-gogreen-text-secondary mt-0.5 truncate max-w-[150px]">
+                {nativeHost?.runtime_environment || 'Logical execution units'}
               </div>
             </div>
             <div className="p-3 bg-gogreen-bg-elevated border border-gogreen-border rounded">
@@ -115,8 +183,10 @@ export const OverviewPage: React.FC = () => {
             </div>
           </div>
           <div className="px-4 py-2 bg-gogreen-bg-secondary/40 border-t border-gogreen-border/60 flex items-center justify-between text-[11px] font-mono">
-            <span className="text-gogreen-text-secondary">Client Binary Engine</span>
-            <span className="text-gogreen-bright font-semibold">ACTIVE</span>
+            <span className="text-gogreen-text-secondary">PMC Counters</span>
+            <span className={`font-semibold ${nativeHost?.perf_event_supported ? 'text-gogreen-bright' : 'text-gogreen-warning'}`}>
+              {nativeHost?.perf_event_supported ? 'ACTIVE (USER)' : 'RESTRICTED'}
+            </span>
           </div>
         </Card>
       </div>
@@ -127,33 +197,44 @@ export const OverviewPage: React.FC = () => {
         <div className="lg:col-span-2 space-y-6">
           <Card
             title="Telemetry Feeds & Operational States"
-            subtitle="Honest telemetry reflection from host hardware & execution engines"
+            subtitle="Honest telemetry reflection from host hardware & native execution engines"
             headerAction={
-              <Badge variant="warning" dot>
-                Awaiting Daemon
-              </Badge>
+              isConnected ? (
+                <Badge variant="primary" dot>
+                  Daemon Linked
+                </Badge>
+              ) : (
+                <Badge variant="warning" dot>
+                  Awaiting Daemon
+                </Badge>
+              )
             }
           >
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* CPU Utilization Panel */}
+              {/* CPU Utilization / Load Panel */}
               <div className="bg-gogreen-bg-main border border-gogreen-border rounded p-4 flex flex-col justify-between">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-mono text-gogreen-text-secondary uppercase">
-                    Host CPU Utilization
+                    Host Load Average (1m)
                   </span>
-                  <StatusIndicator status="standby" label="Waiting for connection" />
+                  <StatusIndicator
+                    status={isConnected ? 'online' : 'standby'}
+                    label={isConnected ? 'Native Telemetry' : 'Waiting for connection'}
+                  />
                 </div>
                 <div className="my-6 text-center">
-                  <div className="text-3xl font-mono font-bold text-gogreen-text-secondary">
-                    -- %
+                  <div className={`text-3xl font-mono font-bold ${isConnected ? 'text-gogreen-bright' : 'text-gogreen-text-secondary'}`}>
+                    {isConnected && telemetry ? telemetry.system.load_1m.toFixed(2) : '--'}
                   </div>
                   <div className="text-xs text-gogreen-text-secondary mt-1">
-                    Daemon offline (No fabricated metric)
+                    {isConnected ? 'Active Linux kernel runqueue load' : 'Daemon offline (No fabricated metric)'}
                   </div>
                 </div>
                 <div className="text-[11px] font-mono text-gogreen-text-secondary border-t border-gogreen-border/50 pt-2 flex justify-between">
                   <span>Detected Cores</span>
-                  <span className="text-gogreen-text-primary">{host.cores} Logical Units</span>
+                  <span className="text-gogreen-text-primary">
+                    {nativeCpu ? `${nativeCpu.physical_cores} Physical / ${nativeCpu.logical_cores} Logical` : `${host.cores} Units`}
+                  </span>
                 </div>
               </div>
 
@@ -163,19 +244,26 @@ export const OverviewPage: React.FC = () => {
                   <span className="text-xs font-mono text-gogreen-text-secondary uppercase">
                     Host RAM Allocation
                   </span>
-                  <StatusIndicator status="standby" label="Waiting for connection" />
+                  <StatusIndicator
+                    status={isConnected ? 'online' : 'standby'}
+                    label={isConnected ? 'Live /proc/meminfo' : 'Waiting for connection'}
+                  />
                 </div>
                 <div className="my-6 text-center">
-                  <div className="text-3xl font-mono font-bold text-gogreen-text-secondary">
-                    -- GB
+                  <div className={`text-3xl font-mono font-bold ${isConnected ? 'text-gogreen-bright' : 'text-gogreen-text-secondary'}`}>
+                    {isConnected && ramUsedGb && ramTotalGb ? `${ramUsedGb} / ${ramTotalGb} GB` : '-- GB'}
                   </div>
                   <div className="text-xs text-gogreen-text-secondary mt-1">
-                    Direct memory telemetry unavailable
+                    {isConnected && telemetry
+                      ? `${telemetry.system.memory.used_percent}% utilized by Linux subsystem`
+                      : 'Direct memory telemetry unavailable'}
                   </div>
                 </div>
                 <div className="text-[11px] font-mono text-gogreen-text-secondary border-t border-gogreen-border/50 pt-2 flex justify-between">
-                  <span>Host OS</span>
-                  <span className="text-gogreen-text-primary truncate max-w-[140px]">{host.platform}</span>
+                  <span>Runtime Substrate</span>
+                  <span className="text-gogreen-text-primary truncate max-w-[140px]">
+                    {nativeHost?.runtime_environment || host.platform}
+                  </span>
                 </div>
               </div>
             </div>

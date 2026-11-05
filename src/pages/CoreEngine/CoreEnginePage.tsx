@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -10,31 +10,134 @@ import {
   CheckCircle2,
   XCircle,
   AlertTriangle,
+  Zap,
 } from 'lucide-react';
 import {
   getHostHardwareInfo,
   getInstructionSetFeatures,
   standardAssemblyRoutines,
+  fetchNativeHealth,
+  fetchNativeCpu,
+  fetchNativeFeatures,
+  triggerNativeBenchmark,
 } from '@/services/systemService';
-import { AssemblyRoutine } from '@/types';
+import {
+  AssemblyRoutine,
+  InstructionSetFeature,
+  NativeCpuInfo,
+  NativeFeatureDetail,
+  NativeDaemonHealth,
+  NativeBenchmarkMetric,
+} from '@/types';
 
 export const CoreEnginePage: React.FC = () => {
   const host = getHostHardwareInfo();
-  const features = getInstructionSetFeatures(host.arch);
+  const fallbackFeatures = getInstructionSetFeatures(host.arch);
+
+  const [daemonHealth, setDaemonHealth] = useState<NativeDaemonHealth | null>(null);
+  const [nativeCpu, setNativeCpu] = useState<NativeCpuInfo | null>(null);
+  const [nativeFeatures, setNativeFeatures] = useState<NativeFeatureDetail[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+
   const [selectedRoutine, setSelectedRoutine] = useState<AssemblyRoutine>(standardAssemblyRoutines[0]!);
   const [isExecuting, setIsExecuting] = useState(false);
-  const [executionMessage, setExecutionMessage] = useState<string | null>(null);
+  const [benchmarkResult, setBenchmarkResult] = useState<NativeBenchmarkMetric | null>(null);
+  const [executionMessage, setExecutionMessage] = useState<{ type: 'success' | 'warn'; text: string } | null>(null);
 
-  const handleExecuteBenchmark = () => {
+  useEffect(() => {
+    let mounted = true;
+
+    const pollDaemon = async () => {
+      const health = await fetchNativeHealth();
+      if (!mounted) return;
+
+      if (health.connected && health.data) {
+        setIsConnected(true);
+        setDaemonHealth(health.data);
+
+        const [cpuData, featsData] = await Promise.all([
+          fetchNativeCpu(),
+          fetchNativeFeatures(),
+        ]);
+
+        if (!mounted) return;
+        if (cpuData) setNativeCpu(cpuData);
+        if (featsData && featsData.length > 0) setNativeFeatures(featsData);
+      } else {
+        setIsConnected(false);
+        setDaemonHealth(null);
+        setNativeCpu(null);
+        setNativeFeatures([]);
+      }
+    };
+
+    pollDaemon();
+    const interval = setInterval(pollDaemon, 3000);
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, []);
+
+  const handleExecuteBenchmark = async () => {
     setIsExecuting(true);
     setExecutionMessage(null);
-    setTimeout(() => {
+    setBenchmarkResult(null);
+
+    if (!isConnected) {
+      setTimeout(() => {
+        setIsExecuting(false);
+        setExecutionMessage({
+          type: 'warn',
+          text: 'Execution halted: Native engine daemon is not connected. Start gogreen-daemon on 127.0.0.1:8080 to run bare-metal assembly kernels.',
+        });
+      }, 500);
+      return;
+    }
+
+    try {
+      // Map routine id to benchmark type
+      let type = 'int-add';
+      if (selectedRoutine.id === 'asm_memcpy') type = 'memcpy';
+      else if (selectedRoutine.id === 'asm_byte_sum') type = 'byte-sum';
+      else if (selectedRoutine.id === 'asm_simd_add_f32') type = 'simd-add';
+
+      const results = await triggerNativeBenchmark(type, true);
       setIsExecuting(false);
-      setExecutionMessage(
-        'Execution halted: Native engine daemon is not connected. Connect native daemon at ipc:///tmp/gogreen-native.sock to run bare-metal benchmarks.'
-      );
-    }, 600);
+
+      if (results.length > 0 && results[0]) {
+        const metric = results[0];
+        setBenchmarkResult(metric);
+        setExecutionMessage({
+          type: 'success',
+          text: `Executed ${metric.name} via ${metric.implementation}: Verified ${metric.verified_correct ? 'CORRECT' : 'FAILED'} in ${metric.duration_ms.toFixed(2)}ms (${metric.throughput_ops_sec.toLocaleString(undefined, { maximumFractionDigits: 0 })} ops/sec, ${metric.throughput_mb_sec.toFixed(1)} MB/s, median ${metric.median_ns.toFixed(1)} ns).`,
+        });
+      } else {
+        setExecutionMessage({
+          type: 'warn',
+          text: 'Benchmark completed with empty result from native daemon.',
+        });
+      }
+    } catch {
+      setIsExecuting(false);
+      setExecutionMessage({
+        type: 'warn',
+        text: 'Failed to communicate with native daemon during benchmark execution.',
+      });
+    }
   };
+
+  // Harmonized feature list: prefer genuine native features if available
+  const displayFeatures: InstructionSetFeature[] = nativeFeatures.length > 0
+    ? nativeFeatures.map((f) => ({
+        name: f.name,
+        category: f.category,
+        supported: f.active,
+        os_supported: f.os_supported,
+        active: f.active,
+        description: f.description,
+      }))
+    : fallbackFeatures;
 
   return (
     <div className="space-y-6">
@@ -43,38 +146,46 @@ export const CoreEnginePage: React.FC = () => {
         <Card noPadding>
           <div className="p-4">
             <div className="text-[11px] font-mono text-gogreen-text-secondary uppercase">
-              Host Architecture
+              Host Architecture & Model
             </div>
             <div className="text-xl font-mono font-bold text-gogreen-bright mt-1 uppercase flex items-center gap-2">
               <Cpu className="w-5 h-5 text-gogreen-primary" />
-              {host.arch}
+              {nativeCpu?.architecture || host.arch}
             </div>
             <div className="text-[11px] text-gogreen-text-secondary mt-1 truncate">
-              {host.platform}
+              {nativeCpu ? `${nativeCpu.vendor} — ${nativeCpu.brand}` : host.platform}
             </div>
           </div>
           <div className="px-4 py-2 bg-gogreen-bg-secondary/40 border-t border-gogreen-border/60 text-[11px] font-mono flex justify-between">
             <span className="text-gogreen-text-secondary">Execution Model</span>
-            <span className="text-gogreen-text-primary">Out-of-Order Speculative</span>
+            <span className="text-gogreen-text-primary">
+              {nativeCpu ? `Family ${nativeCpu.family} Model ${nativeCpu.model} Stepping ${nativeCpu.stepping}` : 'Out-of-Order Speculative'}
+            </span>
           </div>
         </Card>
 
         <Card noPadding>
           <div className="p-4">
             <div className="text-[11px] font-mono text-gogreen-text-secondary uppercase">
-              Logical Core Count
+              Hardware Cores & Cache
             </div>
             <div className="text-xl font-mono font-bold text-gogreen-text-primary mt-1">
-              {host.cores} Threads
+              {nativeCpu ? `${nativeCpu.physical_cores}P / ${nativeCpu.logical_cores}L Cores` : `${host.cores} Threads`}
             </div>
             <div className="text-[11px] text-gogreen-text-secondary mt-1">
-              Hardware concurrency level
+              {nativeCpu
+                ? `L1: ${nativeCpu.cache.l1d_kb}K / L2: ${nativeCpu.cache.l2_kb}K / L3: ${nativeCpu.cache.l3_kb / 1024}MB`
+                : 'Hardware concurrency level'}
             </div>
           </div>
           <div className="px-4 py-2 bg-gogreen-bg-secondary/40 border-t border-gogreen-border/60 text-[11px] font-mono flex justify-between">
-            <span className="text-gogreen-text-secondary">Vector Register Width</span>
+            <span className="text-gogreen-text-secondary">Active SIMD Width</span>
             <span className="text-gogreen-bright font-semibold">
-              {host.arch === 'x86_64' ? '512-bit (AVX-512)' : '128/256-bit (NEON/SVE)'}
+              {nativeFeatures.some((f) => f.name === 'AVX2' && f.active)
+                ? '256-bit (AVX2)'
+                : nativeFeatures.some((f) => f.name === 'AVX-512F' && f.active)
+                ? '512-bit (AVX-512)'
+                : '128-bit (SSE2/NEON)'}
             </span>
           </div>
         </Card>
@@ -84,17 +195,21 @@ export const CoreEnginePage: React.FC = () => {
             <div className="text-[11px] font-mono text-gogreen-text-secondary uppercase">
               Native Daemon State
             </div>
-            <div className="text-xl font-mono font-bold text-gogreen-text-secondary mt-1 flex items-center gap-2">
-              <StatusIndicator status="offline" />
-              NOT CONNECTED
+            <div className={`text-xl font-mono font-bold mt-1 flex items-center gap-2 ${isConnected ? 'text-gogreen-bright' : 'text-gogreen-text-secondary'}`}>
+              <StatusIndicator status={isConnected ? 'online' : 'offline'} />
+              {isConnected ? 'ONLINE' : 'NOT CONNECTED'}
             </div>
             <div className="text-[11px] text-gogreen-text-secondary mt-1">
-              IPC socket offline
+              {isConnected
+                ? `Uptime: ${daemonHealth?.uptime_seconds || 0}s (v${daemonHealth?.engine_version || '2.0.0'})`
+                : 'Daemon offline on 127.0.0.1:8080'}
             </div>
           </div>
           <div className="px-4 py-2 bg-gogreen-bg-secondary/40 border-t border-gogreen-border/60 text-[11px] font-mono flex justify-between">
-            <span className="text-gogreen-text-secondary">Socket Endpoint</span>
-            <span className="text-gogreen-text-primary">ipc:///tmp/gogreen-native.sock</span>
+            <span className="text-gogreen-text-secondary">HTTP API Endpoint</span>
+            <span className={isConnected ? 'text-gogreen-bright font-semibold' : 'text-gogreen-text-primary'}>
+              http://127.0.0.1:8080
+            </span>
           </div>
         </Card>
       </div>
@@ -105,10 +220,17 @@ export const CoreEnginePage: React.FC = () => {
         <div className="space-y-4">
           <Card
             title="Instruction Set Architecture (ISA)"
-            subtitle="Detected microarchitectural vector & crypto capabilities"
+            subtitle={isConnected ? 'CPUID leaf 1/7 & XCR0 extended register state verification' : 'Detected microarchitectural vector & crypto capabilities'}
+            headerAction={
+              isConnected ? (
+                <Badge variant="primary" size="sm">
+                  {nativeFeatures.filter((f) => f.active).length} Active
+                </Badge>
+              ) : undefined
+            }
           >
             <div className="space-y-2.5 font-mono text-xs">
-              {features.map((feat) => (
+              {displayFeatures.map((feat) => (
                 <div
                   key={feat.name}
                   className="p-2.5 rounded bg-gogreen-bg-main border border-gogreen-border/60 flex items-start justify-between gap-3"
@@ -124,11 +246,11 @@ export const CoreEnginePage: React.FC = () => {
                       {feat.description}
                     </p>
                   </div>
-                  <div>
+                  <div className="shrink-0 text-right">
                     {feat.supported ? (
                       <span className="inline-flex items-center gap-1 text-[11px] text-gogreen-bright font-semibold">
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        SUPPORTED
+                        ACTIVE
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 text-[11px] text-gogreen-text-secondary">
@@ -146,8 +268,8 @@ export const CoreEnginePage: React.FC = () => {
         {/* Assembly Routine Inventory & Code Inspection */}
         <div className="lg:col-span-2 space-y-4">
           <Card
-            title="Assembly Routine Inventory"
-            subtitle="Native optimized microkernels targeting deep hardware execution"
+            title="Assembly Routine Inventory (NASM x86-64)"
+            subtitle="Native optimized microkernels targeting deep hardware execution via System V AMD64 ABI"
             headerAction={
               <Badge variant="primary" dot>
                 {standardAssemblyRoutines.length} Routines
@@ -164,6 +286,7 @@ export const CoreEnginePage: React.FC = () => {
                     onClick={() => {
                       setSelectedRoutine(routine);
                       setExecutionMessage(null);
+                      setBenchmarkResult(null);
                     }}
                     className={`p-3 rounded border text-left transition-all font-mono ${
                       isSelected
@@ -219,9 +342,41 @@ export const CoreEnginePage: React.FC = () => {
 
               {/* Execution Feedback Banner if Attempted */}
               {executionMessage && (
-                <div className="p-3 bg-gogreen-warning/10 border border-gogreen-warning/30 rounded text-xs font-mono text-gogreen-warning flex items-start gap-2">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{executionMessage}</span>
+                <div
+                  className={`p-3 rounded text-xs font-mono flex items-start gap-2 ${
+                    executionMessage.type === 'success'
+                      ? 'bg-gogreen-dark border border-gogreen-border text-gogreen-bright'
+                      : 'bg-gogreen-warning/10 border border-gogreen-warning/30 text-gogreen-warning'
+                  }`}
+                >
+                  {executionMessage.type === 'success' ? (
+                    <Zap className="w-4 h-4 shrink-0 mt-0.5 text-gogreen-bright" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                  )}
+                  <span>{executionMessage.text}</span>
+                </div>
+              )}
+
+              {/* Benchmark Result Detail Card if Available */}
+              {benchmarkResult && (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 p-3 bg-gogreen-bg-panel border border-gogreen-border rounded font-mono text-xs">
+                  <div>
+                    <span className="text-[10px] text-gogreen-text-secondary block">DURATION</span>
+                    <strong className="text-gogreen-text-primary">{benchmarkResult.duration_ms.toFixed(3)} ms</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gogreen-text-secondary block">THROUGHPUT</span>
+                    <strong className="text-gogreen-bright">{benchmarkResult.throughput_ops_sec.toLocaleString(undefined, { maximumFractionDigits: 0 })} ops/s</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gogreen-text-secondary block">BANDWIDTH</span>
+                    <strong className="text-gogreen-text-primary">{benchmarkResult.throughput_mb_sec.toFixed(1)} MB/s</strong>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-gogreen-text-secondary block">MEDIAN LATENCY</span>
+                    <strong className="text-gogreen-bright">{benchmarkResult.median_ns.toFixed(1)} ns</strong>
+                  </div>
                 </div>
               )}
 
@@ -229,7 +384,7 @@ export const CoreEnginePage: React.FC = () => {
               <CodeViewer
                 code={selectedRoutine.codeSnippet}
                 language="assembly"
-                title={`${selectedRoutine.name}.s`}
+                title={`${selectedRoutine.name}.asm`}
               />
             </div>
           </Card>

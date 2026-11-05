@@ -24,7 +24,103 @@ export interface InstructionSetFeature {
   name: string;
   category: 'SIMD' | 'Vector' | 'Cryptography' | 'Virtualization' | 'Base';
   supported: boolean;
+  os_supported?: boolean;
+  active?: boolean;
   description: string;
+}
+
+export interface NativeCpuInfo {
+  vendor: string;
+  brand: string;
+  architecture: Architecture;
+  family: number;
+  model: number;
+  stepping: number;
+  logical_cores: number;
+  physical_cores: number;
+  cache: {
+    l1d_kb: number;
+    l1i_kb: number;
+    l2_kb: number;
+    l3_kb: number;
+  };
+}
+
+export interface NativeFeatureDetail {
+  name: string;
+  category: 'SIMD' | 'Vector' | 'Cryptography' | 'Virtualization' | 'Base';
+  hw_supported: boolean;
+  os_supported: boolean;
+  active: boolean;
+  description: string;
+}
+
+export interface NativeHostInfo {
+  os_name: string;
+  os_release: string;
+  kernel_version: string;
+  hostname: string;
+  runtime_environment: string;
+  uptime_seconds: number;
+  load_avg: {
+    '1m': number;
+    '5m': number;
+    '15m': number;
+  };
+  memory: {
+    total_bytes: number;
+    free_bytes: number;
+    available_bytes: number;
+    swap_total_bytes: number;
+    swap_free_bytes: number;
+  };
+  perf_event_supported: boolean;
+  perf_event_status: string;
+}
+
+export interface NativeBenchmarkMetric {
+  id: string;
+  name: string;
+  category: string;
+  implementation: string;
+  input_size_bytes: number;
+  iterations: number;
+  duration_ms: number;
+  throughput_ops_sec: number;
+  throughput_mb_sec: number;
+  min_ns: number;
+  max_ns: number;
+  median_ns: number;
+  p90_ns: number;
+  p99_ns: number;
+  timestamp: string;
+  verified_correct: boolean;
+}
+
+export interface NativeDaemonHealth {
+  status: 'healthy' | 'unhealthy';
+  initialized: boolean;
+  uptime_seconds: number;
+  engine_version: string;
+  timestamp: string;
+}
+
+export interface NativeTelemetrySnapshot {
+  timestamp: string;
+  uptime_seconds: number;
+  system: {
+    load_1m: number;
+    load_5m: number;
+    load_15m: number;
+    memory: {
+      total_bytes: number;
+      available_bytes: number;
+      free_bytes: number;
+      used_bytes: number;
+      used_percent: number;
+    };
+    perf_event_supported: boolean;
+  };
 }
 
 export interface AssemblyRoutine {
