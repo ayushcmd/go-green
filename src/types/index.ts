@@ -1,0 +1,184 @@
+export type Architecture = 'x86_64' | 'aarch64' | 'riscv64' | 'unknown';
+
+export type OperationalState = 
+  | 'connected'
+  | 'disconnected'
+  | 'standby'
+  | 'no_workers'
+  | 'no_data'
+  | 'degraded';
+
+export interface SystemStatus {
+  gatewayConnected: boolean;
+  nativeEngineConnected: boolean;
+  activeWorkers: number;
+  runningJobs: number;
+  cpuUtilization: number | null;
+  memoryUtilization: number | null;
+  hostArchitecture: Architecture;
+  kernelVersion: string;
+  uptimeSeconds: number;
+}
+
+export interface InstructionSetFeature {
+  name: string;
+  category: 'SIMD' | 'Vector' | 'Cryptography' | 'Virtualization' | 'Base';
+  supported: boolean;
+  description: string;
+}
+
+export interface AssemblyRoutine {
+  id: string;
+  name: string;
+  targetArch: Architecture;
+  isaRequirement: string;
+  instructionCount: number;
+  registerFootprint: string;
+  verified: boolean;
+  description: string;
+  codeSnippet: string;
+}
+
+export interface BinarySection {
+  name: string;
+  virtualAddress: string;
+  virtualSize: number;
+  rawSize: number;
+  entropy: number;
+  flags: string;
+  isExecutable: boolean;
+  isWritable: boolean;
+}
+
+export interface BinarySymbol {
+  name: string;
+  address: string;
+  size: number;
+  type: 'FUNC' | 'OBJECT' | 'IMPORT' | 'EXPORT' | 'NOTYPE';
+  binding: 'GLOBAL' | 'LOCAL' | 'WEAK';
+  section: string;
+}
+
+export interface DisassemblyInstruction {
+  address: string;
+  bytes: string;
+  mnemonic: string;
+  operands: string;
+  comment?: string;
+}
+
+export interface BinaryAnalysisResult {
+  fileName: string;
+  fileSize: number;
+  format: 'ELF64' | 'ELF32' | 'PE32+' | 'PE32' | 'Mach-O' | 'RAW';
+  architecture: Architecture;
+  entryPoint: string;
+  endianness: 'Little Endian' | 'Big Endian';
+  sections: BinarySection[];
+  symbols: BinarySymbol[];
+  disassembly: DisassemblyInstruction[];
+  sha256: string;
+  magicBytes: string;
+  rawBuffer?: ArrayBuffer;
+}
+
+export interface BenchmarkResult {
+  id: string;
+  name: string;
+  category: 'CPU' | 'Memory' | 'IPC' | 'Throughput';
+  targetRoutine: string;
+  iterations: number;
+  durationMs: number;
+  throughputOpsSec: number;
+  cyclesPerOp: number;
+  l1MissRate: number;
+  branchMissRate: number;
+  timestamp: string;
+}
+
+export interface WorkerNode {
+  id: string;
+  hostname: string;
+  ipAddress: string;
+  architecture: Architecture;
+  logicalCores: number;
+  totalMemoryMb: number;
+  status: 'ONLINE' | 'BUSY' | 'OFFLINE' | 'DEGRADED';
+  heartbeatLatencyMs: number;
+  assignedJobs: number;
+  lastHeartbeat: string;
+}
+
+export interface MeshJob {
+  id: string;
+  name: string;
+  submittedAt: string;
+  workerId?: string;
+  priority: 'LOW' | 'NORMAL' | 'HIGH' | 'CRITICAL';
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  executionTimeMs?: number;
+}
+
+export interface SandboxProfile {
+  id: string;
+  name: string;
+  maxCpuShares: number;
+  maxMemoryMb: number;
+  timeoutSeconds: number;
+  networkEnabled: boolean;
+  readOnlyRootFs: boolean;
+  seccompProfile: 'strict' | 'default' | 'permissive';
+  allowedSyscalls: string[];
+}
+
+export interface SystemProcess {
+  pid: number;
+  name: string;
+  user: string;
+  cpuPercent: number;
+  memoryMb: number;
+  threads: number;
+  state: 'Running' | 'Sleeping' | 'Zombie' | 'Stopped';
+}
+
+export interface Experiment {
+  id: string;
+  title: string;
+  category: string;
+  compiler: string;
+  optimizationLevel: '-O0' | '-O1' | '-O2' | '-O3' | '-Ofast';
+  isaExtension: string;
+  createdAt: string;
+  sha256Hash: string;
+  reproducible: boolean;
+  notes: string;
+}
+
+export interface LogEntry {
+  id: string;
+  timestamp: string;
+  level: 'DEBUG' | 'INFO' | 'WARN' | 'ERROR' | 'PANIC';
+  service: string;
+  message: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface AppSettings {
+  general: {
+    telemetryRefreshInterval: number;
+    denseMode: boolean;
+    terminalFontSize: number;
+    showDisassemblyHex: boolean;
+  };
+  endpoints: {
+    gatewayUrl: string;
+    nativeDaemonRpc: string;
+    meshCoordinatorRpc: string;
+    autoReconnect: boolean;
+  };
+  security: {
+    enforceMtls: boolean;
+    sandboxStrictSeccomp: boolean;
+    allowLocalBinaryAnalysis: boolean;
+  };
+}
