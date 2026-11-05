@@ -1,12 +1,25 @@
 # GoGreen Implementation Status
 
-## Phase 0, Phase 1, Phase 2, Phase 3, Phase 3.5 & Phase 4 Execution Summary
+## Phase 0, Phase 1, Phase 2, Phase 3, Phase 3.5, Phase 4 & Phase 5 Execution Summary
 **Project:** GoGreen  
 **Product Identity:** BUILD DEEP. THINK LOW-LEVEL. ENGINEER BEYOND LIMITS.  
 **Repository:** `https://github.com/ayushcmd/go-green.git`  
 **Owner:** `ayushcmd`  
-**Current Phase:** Phase 4 Complete (Advanced Binary Engineering — BinaryLab)  
+**Current Phase:** Phase 5 Complete (Sandbox & Execution Engineering)  
 **Date:** November 2026  
+
+---
+
+### Hardened Sandbox & Execution Engineering (Phase 5)
+| Subsystem | Path | Status | Key Capabilities |
+| :--- | :--- | :--- | :--- |
+| **Threat Model & Security Policy** | `docs/SANDBOX_THREAT_MODEL.md`, `ISOLATION_POLICIES.md`, `EXECUTION_LIFECYCLE.md` | Complete | Strict multi-tier trust boundaries separating Coordinator, Authenticated Worker, Sandbox Supervisor, and Untrusted Workloads. Zero direct execution of untrusted code on host. |
+| **Rust Sandbox Supervisor** | `services/sandbox-manager/` | Complete | Modular Rust + Tokio supervisor: `config/`, `isolation/`, `resources/`, `security/`, `artifacts/`, `telemetry/`, `lifecycle/`, `runtime/`, `main.rs`. Multi-tier Linux isolation via Namespaces (PID, Mount, Net, IPC, UTS), cgroups v2 (`memory.max`, `memory.swap.max = 0`, `cpu.max`, `pids.max`), Seccomp-BPF restrictive syscall filters, and POSIX `rlimit` (`RLIMIT_CORE = 0`, `RLIMIT_AS`, `RLIMIT_NPROC`, `RLIMIT_FSIZE`). |
+| **Host Capabilities Prober** | `services/sandbox-manager/src/isolation/capabilities.rs` | Complete | Honest kernel capability detection without faking. Probes `/proc/self/ns/`, `/sys/fs/cgroup/cgroup.controllers`, `/proc/sys/kernel/seccomp`, `/sys/kernel/security/lsm` (Landlock LSM), and `/proc/sys/kernel/unprivileged_userns_clone`. |
+| **Bounded Artifact Management** | `services/sandbox-manager/src/artifacts/` | Complete | Captures bounded stdout/stderr (1MB-4MB quota) on disk (`dist/artifacts/executions/<execution_id>/`). Never stores raw binaries in database. Emits `manifest.json` with cryptographic SHA-256 digests of stdout, stderr, and binary. |
+| **Watchdog Lifecycle & Recovery** | `services/sandbox-manager/src/lifecycle/` | Complete | Asynchronous watchdog timer for timeouts (SIGTERM followed by SIGKILL after 500ms grace period), OOM detection via cgroups v2 memory peaks, clean process group termination, and guaranteed cleanup of temporary workspaces and cgroups. |
+| **Distributed Mesh Integration** | `contracts/protobuf/gogreen/mesh/v1/job.proto`, `services/worker-agent/` | Complete | Added `WORKLOAD_TYPE_SANDBOX_EXECUTION = 6` to Protobuf contract. Updated Go worker agent (`executor.go`) with request validation and HTTP dispatch to sandbox supervisor, and Java scheduler allowlist (`SchedulerEngine.java`). |
+| **GoGreen Studio Sandbox UI** | `src/pages/Sandbox/SandboxPage.tsx` | Complete | Industrial green execution environment: Host Capabilities Matrix, Approved Workload Profiles (`NativeBenchmarkProfile`, `StaticAnalysisProfile`, `ControlledTestProfile`), Interactive Execution Console with live log streaming (stdout/stderr/manifest), peak RSS and CPU metrics, and Security Audit Log for trapped syscalls and watchdog timeouts. |
 
 ---
 

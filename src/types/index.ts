@@ -215,9 +215,72 @@ export interface MeshJob {
   executionTimeMs?: number;
 }
 
+export interface HostCapabilities {
+  cgroupsV2Available: boolean;
+  cgroupControllers: string[];
+  pidNamespace: boolean;
+  mountNamespace: boolean;
+  networkNamespace: boolean;
+  ipcNamespace: boolean;
+  utsNamespace: boolean;
+  userNamespace: boolean;
+  seccompAvailable: boolean;
+  landlockAvailable: boolean;
+  unprivilegedUsernsEnabled: boolean;
+  kernelVersion: string;
+}
+
+export interface SandboxExecutionRecord {
+  executionId: string;
+  workloadId: string;
+  profileName: string;
+  command: string;
+  status: 'PENDING' | 'RUNNING' | 'SUCCESS' | 'FAILED' | 'TIMED_OUT' | 'OOM_KILLED' | 'SECURITY_VIOLATION';
+  exitCode: number;
+  wallTimeMs: number;
+  cpuTimeMs: number;
+  peakRssBytes: number;
+  minorPageFaults: number;
+  majorPageFaults: number;
+  stdoutTruncated: boolean;
+  stderrTruncated: boolean;
+  stdout: string;
+  stderr: string;
+  sha256Digest: string;
+  timestamp: string;
+  errorMessage?: string;
+}
+
+export interface SandboxTelemetryMetrics {
+  totalExecutions: number;
+  successfulExecutions: number;
+  failedExecutions: number;
+  timedOutExecutions: number;
+  oomKilledExecutions: number;
+  securityViolations: number;
+  activeSandboxes: number;
+  cumulativeWallTimeMs: number;
+  cumulativeCpuTimeMs: number;
+}
+
+export interface SandboxSecurityAudit {
+  id: string;
+  timestamp: string;
+  eventType: 'BLOCKED_SYSCALL' | 'OOM_ENFORCEMENT' | 'WATCHDOG_TIMEOUT' | 'PRIVILEGE_ATTEMPT' | 'PATH_TRAVERSAL_BLOCKED';
+  severity: 'WARNING' | 'CRITICAL';
+  workloadId: string;
+  details: string;
+  policyViolated: string;
+}
+
 export interface SandboxProfile {
   id: string;
   name: string;
+  category?: 'NativeBenchmark' | 'StaticAnalysis' | 'ControlledTest';
+  cpuQuotaUs?: number;
+  cpuPeriodUs?: number;
+  maxPids?: number;
+  maxOutputBytes?: number;
   maxCpuShares: number;
   maxMemoryMb: number;
   timeoutSeconds: number;

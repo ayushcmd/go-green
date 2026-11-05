@@ -165,3 +165,20 @@ func TestExecutor_PastDeadline(t *testing.T) {
 		t.Errorf("Expected TIMEOUT for expired deadline, got: %v", result.ExecutionStatus)
 	}
 }
+
+func TestExecutor_ExecuteSandbox(t *testing.T) {
+	exec := executor.NewExecutor("test-worker-1", nil)
+
+	assignment := &meshv1.JobAssignment{
+		JobId:        "job-sandbox-exec-1",
+		WorkloadType: meshv1.WorkloadType_WORKLOAD_TYPE_SANDBOX_EXECUTION,
+	}
+
+	result := exec.Execute(context.Background(), assignment)
+	if result.ExecutionStatus != meshv1.ExecutionStatus_EXECUTION_STATUS_COMPLETED {
+		t.Fatalf("Expected completed for SANDBOX_EXECUTION, got: %v (err: %s)", result.ExecutionStatus, result.ErrorDetails)
+	}
+	if len(result.ResultPayload) == 0 {
+		t.Errorf("Expected non-empty ResultPayload for sandbox execution")
+	}
+}

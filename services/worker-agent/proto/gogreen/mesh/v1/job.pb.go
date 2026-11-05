@@ -31,6 +31,7 @@ const (
 	WorkloadType_WORKLOAD_TYPE_NATIVE_BENCHMARK_SUITE WorkloadType = 3
 	WorkloadType_WORKLOAD_TYPE_BINARY_ANALYSIS        WorkloadType = 4
 	WorkloadType_WORKLOAD_TYPE_COMPILER_EXPLORER      WorkloadType = 5
+	WorkloadType_WORKLOAD_TYPE_SANDBOX_EXECUTION     WorkloadType = 6
 )
 
 // Enum value maps for WorkloadType.
@@ -42,6 +43,7 @@ var (
 		3: "WORKLOAD_TYPE_NATIVE_BENCHMARK_SUITE",
 		4: "WORKLOAD_TYPE_BINARY_ANALYSIS",
 		5: "WORKLOAD_TYPE_COMPILER_EXPLORER",
+		6: "WORKLOAD_TYPE_SANDBOX_EXECUTION",
 	}
 	WorkloadType_value = map[string]int32{
 		"WORKLOAD_TYPE_UNSPECIFIED":            0,
@@ -50,6 +52,7 @@ var (
 		"WORKLOAD_TYPE_NATIVE_BENCHMARK_SUITE": 3,
 		"WORKLOAD_TYPE_BINARY_ANALYSIS":        4,
 		"WORKLOAD_TYPE_COMPILER_EXPLORER":      5,
+		"WORKLOAD_TYPE_SANDBOX_EXECUTION":     6,
 	}
 )
 

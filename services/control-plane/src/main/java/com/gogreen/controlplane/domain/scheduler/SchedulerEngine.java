@@ -25,7 +25,8 @@ public class SchedulerEngine {
             "SYSTEM_TELEMETRY",
             "NATIVE_BENCHMARK_SUITE",
             "BINARY_ANALYSIS",
-            "COMPILER_EXPLORER"
+            "COMPILER_EXPLORER",
+            "SANDBOX_EXECUTION"
     );
 
     private final WorkerRepository workerRepository;
