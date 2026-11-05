@@ -1,0 +1,54 @@
+syntax = "proto3";
+
+package gogreen.mesh.v1;
+
+option go_package = "github.com/ayushcmd/go-green/services/worker-agent/proto/gogreen/mesh/v1;meshv1";
+option java_package = "com.gogreen.mesh.v1";
+option java_multiple_files = true;
+
+import "google/protobuf/timestamp.proto";
+import "gogreen/mesh/v1/worker.proto";
+import "gogreen/mesh/v1/heartbeat.proto";
+import "gogreen/mesh/v1/job.proto";
+import "gogreen/mesh/v1/telemetry.proto";
+
+message CoordinatorCommand {
+  enum Action {
+    ACTION_UNSPECIFIED = 0;
+    ACTION_DRAIN = 1;
+    ACTION_RESUME = 2;
+    ACTION_SHUTDOWN = 3;
+    ACTION_FLUSH_TELEMETRY = 4;
+  }
+  string command_id = 1;
+  Action action = 2;
+  string payload = 3;
+  google.protobuf.Timestamp issued_at = 4;
+}
+
+message WorkerMessage {
+  oneof payload {
+    WorkerRegistration registration = 1;
+    WorkerHeartbeat heartbeat = 2;
+    JobAcknowledgement job_ack = 3;
+    JobProgress job_progress = 4;
+    JobResult job_result = 5;
+    WorkerShutdownNotification shutdown = 6;
+    TelemetrySnapshot telemetry = 7;
+  }
+}
+
+message CoordinatorMessage {
+  oneof payload {
+    WorkerRegistrationAck registration_ack = 1;
+    HeartbeatAck heartbeat_ack = 2;
+    JobAssignment job_assignment = 3;
+    JobCancellation job_cancellation = 4;
+    CoordinatorCommand command = 5;
+  }
+}
+
+service MeshCoordinator {
+  // Bidirectional streaming channel between Worker Agent and Control Plane Coordinator
+  rpc Connect(stream WorkerMessage) returns (stream CoordinatorMessage);
+}

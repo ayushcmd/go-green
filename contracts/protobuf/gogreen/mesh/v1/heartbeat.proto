@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package gogreen.mesh.v1;
+
+option go_package = "github.com/ayushcmd/go-green/services/worker-agent/proto/gogreen/mesh/v1;meshv1";
+option java_package = "com.gogreen.mesh.v1";
+option java_multiple_files = true;
+
+import "google/protobuf/timestamp.proto";
+import "gogreen/mesh/v1/worker.proto";
+
+message WorkerHeartbeat {
+  string worker_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  uint64 uptime_seconds = 3;
+  WorkerStatus worker_status = 4;
+  double cpu_usage_percent = 5;
+  uint64 memory_used_bytes = 6;
+  uint32 active_jobs = 7;
+  string native_daemon_status = 8;
+  double system_load_1m = 9;
+  uint64 sequence_number = 10;
+}
+
+message HeartbeatAck {
+  string worker_id = 1;
+  uint64 acknowledged_sequence = 2;
+  google.protobuf.Timestamp timestamp = 3;
+  bool request_immediate_report = 4;
+}

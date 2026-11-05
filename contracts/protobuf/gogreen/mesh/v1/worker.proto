@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package gogreen.mesh.v1;
+
+option go_package = "github.com/ayushcmd/go-green/services/worker-agent/proto/gogreen/mesh/v1;meshv1";
+option java_package = "com.gogreen.mesh.v1";
+option java_multiple_files = true;
+
+import "google/protobuf/timestamp.proto";
+
+enum WorkerStatus {
+  WORKER_STATUS_UNSPECIFIED = 0;
+  WORKER_STATUS_IDLE = 1;
+  WORKER_STATUS_BUSY = 2;
+  WORKER_STATUS_DRAINING = 3;
+  WORKER_STATUS_DEGRADED = 4;
+  WORKER_STATUS_TERMINATING = 5;
+}
+
+message WorkerRegistration {
+  string worker_id = 1;
+  string hostname = 2;
+  string operating_system = 3;
+  string architecture = 4;
+  string cpu_vendor = 5;
+  string cpu_model = 6;
+  uint32 physical_cores = 7;
+  uint32 logical_cores = 8;
+  repeated string supported_instruction_sets = 9;
+  uint64 memory_total_bytes = 10;
+  string native_engine_version = 11;
+  string worker_version = 12;
+  string protocol_version = 13;
+  map<string, string> labels = 14;
+}
+
+message WorkerRegistrationAck {
+  bool accepted = 1;
+  string worker_id = 2;
+  string assigned_partition = 3;
+  uint32 heartbeat_interval_seconds = 4;
+  string message = 5;
+  google.protobuf.Timestamp registered_at = 6;
+}
+
+message WorkerShutdownNotification {
+  string worker_id = 1;
+  string reason = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}

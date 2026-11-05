@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package gogreen.mesh.v1;
+
+option go_package = "github.com/ayushcmd/go-green/services/worker-agent/proto/gogreen/mesh/v1;meshv1";
+option java_package = "com.gogreen.mesh.v1";
+option java_multiple_files = true;
+
+import "google/protobuf/timestamp.proto";
+
+message TelemetrySnapshot {
+  string worker_id = 1;
+  google.protobuf.Timestamp timestamp = 2;
+  double cpu_load_1m = 3;
+  double cpu_load_5m = 4;
+  double cpu_load_15m = 5;
+  uint64 memory_total_bytes = 6;
+  uint64 memory_used_bytes = 7;
+  uint64 memory_available_bytes = 8;
+  bool perf_event_supported = 9;
+  string perf_event_status = 10;
+  uint32 active_goroutines = 11;
+}
+
+message BenchmarkTelemetryRecord {
+  string benchmark_id = 1;
+  string name = 2;
+  string implementation = 3;
+  double duration_ms = 4;
+  double throughput_ops_sec = 5;
+  double throughput_mb_sec = 6;
+  double median_ns = 7;
+  bool verified_correct = 8;
+  google.protobuf.Timestamp timestamp = 9;
+}

@@ -1,0 +1,38 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: gogreen-control-plane
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:h2:mem:gogreen_mesh;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE}
+    driver-class-name: ${SPRING_DATASOURCE_DRIVER:org.h2.Driver}
+    username: ${SPRING_DATASOURCE_USERNAME:sa}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  jpa:
+    database-platform: ${SPRING_JPA_PLATFORM:org.hibernate.dialect.H2Dialect}
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+mesh:
+  coordinator:
+    grpc:
+      port: ${GOGREEN_COORDINATOR_GRPC_PORT:50051}
+      heartbeat-timeout-seconds: ${GOGREEN_HEARTBEAT_TIMEOUT:10}
+      worker-heartbeat-interval-seconds: ${GOGREEN_DEFAULT_HEARTBEAT_INTERVAL:3}
+      max-message-size: 8388608 # 8MB
+      tls:
+        enabled: ${GOGREEN_TLS_ENABLED:false}
+        mtls-enabled: ${GOGREEN_MTLS_ENABLED:false}
+        cert-chain-path: ${GOGREEN_TLS_CERT_PATH:}
+        private-key-path: ${GOGREEN_TLS_KEY_PATH:}
+        trust-cert-path: ${GOGREEN_TLS_CA_PATH:}
+    partition:
+      default-name: "partition-primary"
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics

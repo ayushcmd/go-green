@@ -1,0 +1,84 @@
+syntax = "proto3";
+
+package gogreen.mesh.v1;
+
+option go_package = "github.com/ayushcmd/go-green/services/worker-agent/proto/gogreen/mesh/v1;meshv1";
+option java_package = "com.gogreen.mesh.v1";
+option java_multiple_files = true;
+
+import "google/protobuf/timestamp.proto";
+
+enum WorkloadType {
+  WORKLOAD_TYPE_UNSPECIFIED = 0;
+  WORKLOAD_TYPE_CPU_INFORMATION = 1;
+  WORKLOAD_TYPE_SYSTEM_TELEMETRY = 2;
+  WORKLOAD_TYPE_NATIVE_BENCHMARK_SUITE = 3;
+}
+
+enum ExecutionStatus {
+  EXECUTION_STATUS_UNSPECIFIED = 0;
+  EXECUTION_STATUS_PENDING = 1;
+  EXECUTION_STATUS_RUNNING = 2;
+  EXECUTION_STATUS_COMPLETED = 3;
+  EXECUTION_STATUS_FAILED = 4;
+  EXECUTION_STATUS_CANCELLED = 5;
+  EXECUTION_STATUS_TIMEOUT = 6;
+}
+
+message ResourceRequirements {
+  uint32 cpu_shares = 1;
+  uint64 memory_max_bytes = 2;
+  repeated string required_features = 3;
+}
+
+message JobSubmission {
+  string job_id = 1;
+  WorkloadType workload_type = 2;
+  bytes payload = 3;
+  string required_architecture = 4;
+  repeated string required_instruction_sets = 5;
+  ResourceRequirements resource_requirements = 6;
+  uint32 timeout_seconds = 7;
+  google.protobuf.Timestamp created_at = 8;
+}
+
+message JobAssignment {
+  string job_id = 1;
+  WorkloadType workload_type = 2;
+  bytes validated_payload = 3;
+  ResourceRequirements resource_requirements = 4;
+  google.protobuf.Timestamp execution_deadline = 5;
+}
+
+message JobAcknowledgement {
+  string job_id = 1;
+  string worker_id = 2;
+  bool accepted = 3;
+  string rejection_reason = 4;
+  google.protobuf.Timestamp acknowledged_at = 5;
+}
+
+message JobProgress {
+  string job_id = 1;
+  string worker_id = 2;
+  double progress_percent = 3;
+  string status_message = 4;
+  google.protobuf.Timestamp updated_at = 5;
+}
+
+message JobResult {
+  string job_id = 1;
+  string worker_id = 2;
+  ExecutionStatus execution_status = 3;
+  bytes result_payload = 4;
+  double execution_duration_ms = 5;
+  google.protobuf.Timestamp started_at = 6;
+  google.protobuf.Timestamp completed_at = 7;
+  string error_details = 8;
+}
+
+message JobCancellation {
+  string job_id = 1;
+  string reason = 2;
+  google.protobuf.Timestamp cancelled_at = 3;
+}
