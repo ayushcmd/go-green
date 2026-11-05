@@ -20,11 +20,15 @@ type MockCoordinator struct {
 	receivedHeartbeats   []*meshv1.WorkerHeartbeat
 	receivedResults      []*meshv1.JobResult
 	receivedShutdowns    []*meshv1.WorkerShutdownNotification
+	receivedAcks         []*meshv1.JobAcknowledgement
+	receivedProgress     []*meshv1.JobProgress
 	jobsToDispatch       []*meshv1.JobAssignment
 
 	onRegisterCb         func(*meshv1.WorkerRegistration)
 	onHeartbeatCb        func(*meshv1.WorkerHeartbeat)
 	onResultCb           func(*meshv1.JobResult)
+	onAckCb              func(*meshv1.JobAcknowledgement)
+	onProgressCb         func(*meshv1.JobProgress)
 	onShutdownCb         func(*meshv1.WorkerShutdownNotification)
 
 	activeStreams        []grpc.BidiStreamingServer[meshv1.WorkerMessage, meshv1.CoordinatorMessage]
@@ -126,6 +130,28 @@ func (m *MockCoordinator) Connect(stream grpc.BidiStreamingServer[meshv1.WorkerM
 			}
 			if err := stream.Send(hbAck); err != nil {
 				return err
+			}
+		}
+
+		if ack := msg.GetJobAck(); ack != nil {
+			m.mu.Lock()
+			m.receivedAcks = append(m.receivedAcks, ack)
+			cb := m.onAckCb
+			m.mu.Unlock()
+
+			if cb != nil {
+				cb(ack)
+			}
+		}
+
+		if prog := msg.GetJobProgress(); prog != nil {
+			m.mu.Lock()
+			m.receivedProgress = append(m.receivedProgress, prog)
+			cb := m.onProgressCb
+			m.mu.Unlock()
+
+			if cb != nil {
+				cb(prog)
 			}
 		}
 

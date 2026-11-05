@@ -65,6 +65,34 @@
   - REST API controllers for Studio UI distributed mesh integration.
 - [x] Comprehensive test suites (Go unit tests and integration tests passing 100%).
 
+## Phase 3.5: Distributed Scheduler, Persistence & Multi-Worker Execution
+- [x] Java Scheduler Engine with deterministic worker compatibility:
+  - Architecture matching and strict ISA verification (AVX2 workloads never scheduled to non-AVX2 workers).
+  - Capacity bounds (max 4 active jobs, CPU < 95%, available memory check).
+  - Multi-factor load-balancing score (active jobs -> CPU usage -> free memory).
+- [x] Durable Database Persistence (PostgreSQL & H2):
+  - Flyway migration `V1__init_mesh_schema.sql`.
+  - JPA entities and repositories: `WorkerEntity`, `WorkerSessionEntity`, `JobEntity`, `JobExecutionAttemptEntity`, `SchedulingDecisionEntity`, `WorkerStateTransitionEntity`.
+  - Zero volatile in-memory-only records; persistence across coordinator restarts.
+- [x] Resilient Asynchronous Event Bus:
+  - NATS JetStream integration with automatic fallback to high-performance in-memory bus.
+  - Event types: `worker.registered`, `worker.heartbeat`, `worker.disconnected`, `job.submitted`, `job.assigned`, `job.started`, `job.completed`, `job.failed`, `job.cancelled`.
+  - In-flight and historical event deduplication, bounded retries, and Dead-Letter Queue (DLQ).
+- [x] Multi-Worker Execution:
+  - Concurrent multi-worker support in Go worker agent.
+  - Multi-worker integration test verifying simultaneous registrations, dual heartbeat streams, job assignment, ack, progress, result delivery, and graceful shutdown.
+  - Failure reconciliation: automatic requeuing and retry of orphaned jobs upon worker disconnection.
+- [x] Comprehensive REST API for Mesh & Jobs:
+  - `GET /api/v1/mesh/status`
+  - `GET /api/v1/mesh/workers` & `GET /api/v1/mesh/workers/{id}`
+  - `POST /api/v1/mesh/jobs`
+  - `GET /api/v1/mesh/jobs` & `GET /api/v1/mesh/jobs/{id}`
+  - `POST /api/v1/mesh/jobs/{id}/cancel`
+- [x] Automated Test Verification:
+  - 22 Java unit and integration tests passing (100% pass rate).
+  - 17 Go unit and integration tests passing (100% pass rate).
+  - React Studio UI Vitest and production build passing.
+
 ## Phase 4: Hardened Sandbox Isolation
 - [ ] Linux cgroups v2 + Seccomp-BPF runtime enforcement.
 - [ ] Windows AppContainer / Job Object sandboxing.

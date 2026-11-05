@@ -246,6 +246,19 @@ func (a *Agent) HandleJobAssignment(assignment *meshv1.JobAssignment) error {
 		Payload: &meshv1.WorkerMessage_JobAck{JobAck: ack},
 	})
 
+	// Send initial progress
+	_ = a.grpcClient.Send(&meshv1.WorkerMessage{
+		Payload: &meshv1.WorkerMessage_JobProgress{
+			JobProgress: &meshv1.JobProgress{
+				JobId:           assignment.JobId,
+				WorkerId:        a.cfg.WorkerID,
+				ProgressPercent: 10.0,
+				StatusMessage:   "Starting execution",
+				UpdatedAt:       timestamppb.New(time.Now()),
+			},
+		},
+	})
+
 	// 2. Track cancellation context
 	jobCtx, cancel := context.WithCancel(context.Background())
 	a.activeCancelsMu.Lock()

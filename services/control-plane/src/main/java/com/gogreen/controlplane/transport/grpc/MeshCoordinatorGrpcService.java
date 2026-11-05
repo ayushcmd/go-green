@@ -1,8 +1,8 @@
 package com.gogreen.controlplane.transport.grpc;
 
-import com.gogreen.controlplane.domain.model.WorkerNode;
-import com.gogreen.controlplane.domain.service.JobSchedulerService;
+import com.gogreen.controlplane.domain.service.JobLifecycleService;
 import com.gogreen.controlplane.domain.service.WorkerRegistryService;
+import com.gogreen.controlplane.infrastructure.persistence.entity.WorkerEntity;
 import com.gogreen.mesh.v1.*;
 import com.google.protobuf.Timestamp;
 import io.grpc.stub.StreamObserver;
@@ -19,7 +19,7 @@ public class MeshCoordinatorGrpcService extends MeshCoordinatorGrpc.MeshCoordina
     private static final Logger log = LoggerFactory.getLogger(MeshCoordinatorGrpcService.class);
 
     private final WorkerRegistryService workerRegistryService;
-    private final JobSchedulerService jobSchedulerService;
+    private final JobLifecycleService jobLifecycleService;
     private final int defaultHeartbeatInterval;
 
     // Track active response streams by workerId
@@ -27,10 +27,10 @@ public class MeshCoordinatorGrpcService extends MeshCoordinatorGrpc.MeshCoordina
 
     public MeshCoordinatorGrpcService(
             WorkerRegistryService workerRegistryService,
-            JobSchedulerService jobSchedulerService,
+            JobLifecycleService jobLifecycleService,
             @Value("${mesh.coordinator.grpc.worker-heartbeat-interval-seconds:3}") int defaultHeartbeatInterval) {
         this.workerRegistryService = workerRegistryService;
-        this.jobSchedulerService = jobSchedulerService;
+        this.jobLifecycleService = jobLifecycleService;
         this.defaultHeartbeatInterval = defaultHeartbeatInterval;
     }
 
@@ -57,7 +57,7 @@ public class MeshCoordinatorGrpcService extends MeshCoordinatorGrpc.MeshCoordina
                 this.attachedWorkerId = reg.getWorkerId();
                 activeStreams.put(reg.getWorkerId(), responseObserver);
 
-                WorkerNode node = workerRegistryService.registerWorker(reg);
+                WorkerEntity node = workerRegistryService.registerWorker(reg);
 
                 CoordinatorMessage ack = CoordinatorMessage.newBuilder()
                         .setRegistrationAck(WorkerRegistrationAck.newBuilder()
@@ -70,7 +70,9 @@ public class MeshCoordinatorGrpcService extends MeshCoordinatorGrpc.MeshCoordina
                                 .build())
                         .build();
 
-                responseObserver.onNext(ack);
+                synchronized (responseObserver) {
+                    responseObserver.onNext(ack);
+                }
             }
 
             private void handleHeartbeat(WorkerHeartbeat hb) {
@@ -84,26 +86,30 @@ public class MeshCoordinatorGrpcService extends MeshCoordinatorGrpc.MeshCoordina
                                 .build())
                         .build();
 
-                responseObserver.onNext(ack);
+                synchronized (responseObserver) {
+                    responseObserver.onNext(ack);
+                }
             }
 
             private void handleJobAck(JobAcknowledgement ack) {
                 log.info("Job acknowledged: JobID={}, WorkerID={}, Accepted={}",
                         ack.getJobId(), ack.getWorkerId(), ack.getAccepted());
+                jobLifecycleService.handleJobAck(ack.getJobId(), ack.getWorkerId(),
+                        ack.getAccepted(), ack.getRejectionReason());
             }
 
             private void handleJobProgress(JobProgress progress) {
-                log.debug("Job progress: JobID={}, Progress={}%",
-                        progress.getJobId(), progress.getProgressPercent());
+                log.debug("Job progress: JobID={}, WorkerID={}, Progress={}%",
+                        progress.getJobId(), progress.getWorkerId(), progress.getProgressPercent());
             }
 
             private void handleJobResult(JobResult result) {
-                jobSchedulerService.recordJobResult(result);
+                jobLifecycleService.handleJobResult(result);
             }
 
             private void handleShutdown(WorkerShutdownNotification notification) {
                 workerRegistryService.processShutdown(notification);
-                cleanup();
+                cleanup("Worker shutdown notification");
             }
 
             private void handleTelemetry(TelemetrySnapshot snapshot) {
@@ -113,22 +119,29 @@ public class MeshCoordinatorGrpcService extends MeshCoordinatorGrpc.MeshCoordina
             @Override
             public void onError(Throwable t) {
                 log.warn("gRPC client stream error for worker {}: {}", attachedWorkerId, t.getMessage());
-                cleanup();
+                cleanup("Stream error: " + t.getMessage());
             }
 
             @Override
             public void onCompleted() {
                 log.info("gRPC client stream completed for worker {}", attachedWorkerId);
-                cleanup();
-                responseObserver.onCompleted();
+                cleanup("Stream completed");
+                synchronized (responseObserver) {
+                    responseObserver.onCompleted();
+                }
             }
 
-            private void cleanup() {
+            private void cleanup(String reason) {
                 if (attachedWorkerId != null) {
                     activeStreams.remove(attachedWorkerId);
+                    workerRegistryService.handleWorkerDisconnection(attachedWorkerId, reason);
                 }
             }
         };
+    }
+
+    public boolean isWorkerConnected(String workerId) {
+        return activeStreams.containsKey(workerId);
     }
 
     public boolean dispatchJob(String workerId, JobAssignment assignment) {
@@ -141,10 +154,40 @@ public class MeshCoordinatorGrpcService extends MeshCoordinatorGrpc.MeshCoordina
                 .setJobAssignment(assignment)
                 .build();
 
-        synchronized (stream) {
-            stream.onNext(msg);
+        try {
+            synchronized (stream) {
+                stream.onNext(msg);
+            }
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to send JobAssignment to Worker {}: {}", workerId, e.getMessage());
+            return false;
         }
-        return true;
+    }
+
+    public boolean dispatchCancellation(String workerId, String jobId, String reason) {
+        StreamObserver<CoordinatorMessage> stream = activeStreams.get(workerId);
+        if (stream == null) {
+            return false;
+        }
+
+        CoordinatorMessage msg = CoordinatorMessage.newBuilder()
+                .setJobCancellation(JobCancellation.newBuilder()
+                        .setJobId(jobId)
+                        .setReason(reason)
+                        .setCancelledAt(toTimestamp(Instant.now()))
+                        .build())
+                .build();
+
+        try {
+            synchronized (stream) {
+                stream.onNext(msg);
+            }
+            return true;
+        } catch (Exception e) {
+            log.error("Failed to send JobCancellation to Worker {}: {}", workerId, e.getMessage());
+            return false;
+        }
     }
 
     private static Timestamp toTimestamp(Instant instant) {

@@ -1,12 +1,23 @@
 # GoGreen Implementation Status
 
-## Phase 0, Phase 1, Phase 2 & Phase 3 Execution Summary
+## Phase 0, Phase 1, Phase 2, Phase 3 & Phase 3.5 Execution Summary
 **Project:** GoGreen  
 **Product Identity:** BUILD DEEP. THINK LOW-LEVEL. ENGINEER BEYOND LIMITS.  
 **Repository:** `https://github.com/ayushcmd/go-green.git`  
 **Owner:** `ayushcmd`  
-**Current Phase:** Phase 3 Complete (Distributed Mesh Engineering, Protobuf v1 Contracts, Go Worker Agent & Java Control Plane)  
+**Current Phase:** Phase 3.5 Complete (Distributed Scheduler, Persistence & Multi-Worker Execution)  
 **Date:** November 2026  
+
+---
+
+### Distributed Scheduler, Persistence & Multi-Worker Execution (Phase 3.5)
+| Subsystem | Path | Status | Key Capabilities |
+| :--- | :--- | :--- | :--- |
+| **Hardware-Aware Scheduler Engine** | `services/control-plane/src/main/java/com/gogreen/controlplane/domain/scheduler/SchedulerEngine.java` | Complete | Deterministic worker eligibility matching, strict ISA compatibility (never schedule AVX2 on non-AVX2 nodes), CPU capacity guards (<95%), active job limits (<4 per worker), multi-factor load balancing, and persistent decision auditing. |
+| **Durable JPA & Flyway Persistence** | `services/control-plane/infrastructure/persistence/`, `db/migration/V1__init_mesh_schema.sql` | Complete | Relational schema with migrations for workers, sessions, jobs, execution attempts, scheduling decisions, and worker state transitions. Zero volatile in-memory-only records. |
+| **Resilient Event Bus** | `services/control-plane/infrastructure/events/` | Complete | Event-driven architecture with NATS JetStream support, deduplication cache, bounded retry handling, and Dead-Letter Queue (DLQ). Explicit typed events from `worker.registered` to `job.cancelled`. |
+| **Multi-Worker Execution & Failure Reconciliation** | `services/worker-agent/tests/multi_worker_integration_test.go`, `JobLifecycleService.java` | Complete | Dual worker concurrent registrations, parallel heartbeat streaming, job assignment, positive/negative acks, execution progress reporting, result delivery, and worker disconnection job requeuing/reconciliation. |
+| **REST API & Job Management** | `services/control-plane/api/rest/JobController.java`, `MeshStatusController.java` | Complete | Full REST endpoints for mesh status, worker inventory, job submission, job queries, and remote job cancellation. |  
 
 ---
 

@@ -46,3 +46,15 @@ Thumbs.db
 .env
 .env.production
 .env.local
+
+# Java / Maven
+target/
+**/target/
+*.class
+*.jar
+*.war
+
+# Go
+*.exe
+*.test
+*.prof

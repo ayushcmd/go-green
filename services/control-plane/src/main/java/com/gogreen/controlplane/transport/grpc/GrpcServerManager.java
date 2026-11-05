@@ -1,7 +1,6 @@
 package com.gogreen.controlplane.transport.grpc;
 
-import io.grpc.Server;
-import io.grpc.ServerBuilder;
+import io.grpc.*;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import org.slf4j.Logger;
@@ -48,25 +47,31 @@ public class GrpcServerManager {
 
     @PostConstruct
     public void start() throws IOException {
-        ServerBuilder<?> builder = ServerBuilder.forPort(port)
-                .addService(coordinatorService)
-                .maxInboundMessageSize(maxMessageSize);
-
+        ServerCredentials credentials;
         if (tlsEnabled && !certChainPath.isBlank() && !privateKeyPath.isBlank()) {
             File certFile = new File(certChainPath);
             File keyFile = new File(privateKeyPath);
+            TlsServerCredentials.Builder credsBuilder = TlsServerCredentials.newBuilder()
+                    .keyManager(certFile, keyFile);
             if (mtlsEnabled && !trustCertPath.isBlank()) {
                 File trustFile = new File(trustCertPath);
-                builder.useTransportSecurity(certFile, keyFile)
-                        .trustManager(trustFile);
+                credsBuilder.trustManager(trustFile)
+                        .clientAuth(TlsServerCredentials.ClientAuth.REQUIRE);
                 log.info("gRPC server configured with Mutual TLS (mTLS). Trust CA: {}", trustCertPath);
             } else {
-                builder.useTransportSecurity(certFile, keyFile);
                 log.info("gRPC server configured with Server TLS.");
             }
+            credentials = credsBuilder.build();
+        } else {
+            credentials = InsecureServerCredentials.create();
         }
 
-        this.server = builder.build().start();
+        this.server = Grpc.newServerBuilderForPort(port, credentials)
+                .addService(coordinatorService)
+                .maxInboundMessageSize(maxMessageSize)
+                .build()
+                .start();
+
         log.info("GoGreen Mesh gRPC Coordinator Server started on port {}", port);
     }
 

@@ -59,3 +59,55 @@ The GoGreen Distributed Mesh establishes a resilient, high-throughput distribute
    - Workloads are dispatched exclusively to verified local native C++ and assembly routines.
 5. **Transport Security by Default**:
    - Zero-trust communication topology supported via mutual TLS (mTLS) with automated development PKI bootstrapping.
+
+## 3. Phase 3.5: Distributed Scheduler, Persistence & Multi-Worker Execution
+
+### 3.1. Scheduling Engine Architecture
+The GoGreen Scheduler Engine (`com.gogreen.controlplane.domain.scheduler.SchedulerEngine`) implements deterministic, hardware-aware task placement across active mesh workers:
+
+1. **Eligibility Filtering**:
+   - Worker state must be `IDLE` or `BUSY` (rejects `DISCONNECTED`, `DRAINING`, `TERMINATING`).
+   - Liveness check: `now - lastHeartbeatAt <= heartbeatTimeoutSeconds` (default: 10s).
+   - Capacity guards: Active jobs per worker must be strictly `< 4` (`MAX_ACTIVE_JOBS_PER_WORKER = 4`), and CPU usage must be `< 95%`.
+   - Workload type allowlist: strictly permits `CPU_INFORMATION`, `SYSTEM_TELEMETRY`, and `NATIVE_BENCHMARK_SUITE`.
+2. **ISA Compatibility (Strict Enforcement)**:
+   - Workloads requesting specific instruction sets (e.g. `AVX2`, `FMA`, `AVX-512`) are scheduled **only** to workers whose verified hardware profile contains the required flags.
+   - Workers without verified `AVX2` support will **never** receive `AVX2` workloads.
+3. **Multi-Factor Load Balancing & Scoring**:
+   - Eligible workers are ranked using the following criteria:
+     - Priority 1: Fewest active jobs (minimizes queuing latency).
+     - Priority 2: Lowest CPU usage percentage.
+     - Priority 3: Highest available memory (bytes).
+4. **Auditability & Traceability**:
+   - Every scheduling decision (success or rejection) is persisted durably to `mesh_scheduling_decisions` with candidate count, chosen worker, and rationale.
+
+### 3.2. Durable Database Persistence (PostgreSQL & H2)
+Database migrations are managed via Flyway (`db/migration/V1__init_mesh_schema.sql`):
+
+- **`mesh_workers`**: Worker identity, hardware topology (CPUID vendor, model, physical/logical cores, instruction sets), memory, protocol versions, heartbeat sequence, and real-time load telemetry.
+- **`mesh_worker_sessions`**: Connected/disconnected timestamps, disconnect reasons, total heartbeats received, and completed job metrics.
+- **`mesh_jobs`**: Job status (`QUEUED`, `ASSIGNED`, `RUNNING`, `COMPLETED`, `FAILED`, `CANCELLED`, `TIMED_OUT`, `RETRYING`), workload type, hardware constraints, priority, execution deadlines, and binary payloads.
+- **`mesh_job_attempts`**: Immutable log of each execution attempt, worker ID, start/completion times, execution duration, and error details.
+- **`mesh_scheduling_decisions`**: Historical record of every scheduler placement decision.
+- **`mesh_worker_transitions`**: Auditable state transitions (`IDLE`, `BUSY`, `DRAINING`, `DISCONNECTED`).
+
+### 3.3. Asynchronous Resilient Event Bus (NATS JetStream & In-Memory Fallback)
+The mesh features an event-driven telemetry stream with explicit typed events:
+- `worker.registered`, `worker.heartbeat`, `worker.disconnected`
+- `job.submitted`, `job.assigned`, `job.started`, `job.completed`, `job.failed`, `job.cancelled`
+
+Capabilities:
+- **Deduplication**: In-flight and historical event IDs are tracked to eliminate duplicate event emissions.
+- **Bounded Retries & DLQ**: Subscriber processing failures are retried up to 3 times before routing to the Dead-Letter Queue (DLQ).
+- **Dual Mode**: Connects to external NATS JetStream servers when configured (`mesh.nats.enabled=true`), falling back transparently to a high-performance in-memory ring-buffer event bus.
+
+### 3.4. Multi-Worker Execution & Failure Reconciliation
+The mesh protocol supports multiple simultaneously connected Go workers:
+- **Concurrent Heartbeats**: High-frequency multiplexed heartbeats over gRPC bidirectional streams.
+- **Job Lifecycle Protocol**:
+  - `JobAssignment` -> `JobAcknowledgement` (validates worker acceptance)
+  - `JobProgress` (emitted during workload execution)
+  - `JobResult` (delivered upon completion with duration and payload)
+- **Failure Reconciliation**:
+  - Worker disconnection triggers immediate reconciliation of orphaned jobs (`ASSIGNED` or `RUNNING`).
+  - Jobs are requeued with `RETRYING` status until `max_retries` (default: 3) is exceeded, after which they transition permanently to `FAILED`.
