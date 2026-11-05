@@ -278,3 +278,57 @@ export interface AppSettings {
     allowLocalBinaryAnalysis: boolean;
   };
 }
+
+
+export interface BinaryRelocation {
+  offset: string;
+  typeName: string;
+  symbolName: string;
+  addend: number;
+  sectionName: string;
+}
+
+export interface ExtractedString {
+  value: string;
+  offset: number;
+  length: number;
+  category: 'URL' | 'Path' | 'Format' | 'Symbol' | 'Generic';
+}
+
+export interface EntropyAnalysisData {
+  overall: number;
+  chiSquare: number;
+  meanByte: number;
+  assessment: string;
+  blocks: Array<{ offset: number; entropy: number }>;
+  distribution: number[];
+}
+
+export interface CompilerResultData {
+  success: boolean;
+  compiler: string;
+  compilerVersion: string;
+  optimizationLevel: string;
+  assemblyOutput: string;
+  instructions: Array<{ sourceLine: number; text: string }>;
+  errorOutput: string;
+  compilationTimeMs: number;
+}
+
+export interface BinaryDiffData {
+  fileAName: string;
+  fileBName: string;
+  sizeA: number;
+  sizeB: number;
+  sizeDelta: number;
+  sha256A: string;
+  sha256B: string;
+  formatA: string;
+  formatB: string;
+  similarityPercent: number;
+  identicalBytes: number;
+  differentBytes: number;
+  byteDifferences: Array<{ offset: number; length: number; hexA: string; hexB: string }>;
+  sectionDifferences: Array<{ name: string; status: string; sizeA: number; sizeB: number; entropyA: number; entropyB: number }>;
+  symbolDifferences: Array<{ name: string; changeType: string; addressA: number; addressB: number }>;
+}

@@ -39,7 +39,9 @@ func (e *Executor) ValidateJob(assignment *meshv1.JobAssignment) error {
 	switch assignment.WorkloadType {
 	case meshv1.WorkloadType_WORKLOAD_TYPE_CPU_INFORMATION,
 		meshv1.WorkloadType_WORKLOAD_TYPE_SYSTEM_TELEMETRY,
-		meshv1.WorkloadType_WORKLOAD_TYPE_NATIVE_BENCHMARK_SUITE:
+		meshv1.WorkloadType_WORKLOAD_TYPE_NATIVE_BENCHMARK_SUITE,
+		meshv1.WorkloadType_WORKLOAD_TYPE_BINARY_ANALYSIS,
+		meshv1.WorkloadType_WORKLOAD_TYPE_COMPILER_EXPLORER:
 		return nil
 	default:
 		return fmt.Errorf("unsupported or unauthorized workload type: %v", assignment.WorkloadType)

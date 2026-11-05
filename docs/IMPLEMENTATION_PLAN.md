@@ -93,6 +93,35 @@
   - 17 Go unit and integration tests passing (100% pass rate).
   - React Studio UI Vitest and production build passing.
 
-## Phase 4: Hardened Sandbox Isolation
+## Phase 4: Advanced Binary Engineering (BinaryLab)
+- [x] Native C++23 Binary Engine (`native/binary-lab/`):
+  - Bounds-checked `BinaryBuffer` with Big/Little Endian primitive reading and built-in SHA-256 computation.
+  - Multi-format classification (`FormatDetector`): ELF32, ELF64, PE32, PE32+, RAW.
+  - Bounds-checked `ElfParser`: Program headers, section headers, dynamic tags, `.shstrtab` resolution, per-section Shannon entropy.
+  - Bounds-checked `PeParser`: DOS header, COFF header, Optional PE32/PE32+ header, section table, RVA-to-file-offset translation, import directory (ILT/IAT thunk walk), export directory, base relocations.
+  - Unified `SymbolAnalyzer`: `.symtab`, `.dynsym`, PE Exports, and PE Imports.
+  - Unified `RelocationAnalyzer`: ELF `.rela` / `.rel` records and PE base relocations.
+  - Capstone Disassembly Engine (`CS_ARCH_X86`, `CS_MODE_64`, `CS_OPT_DETAIL`): Mnemonics, operands, branch classification, immediate target resolution, symbol annotation mapping.
+  - Binary Intelligence (`EntropyAnalyzer` & `StringExtractor`): Shannon entropy, Chi-square test, 256-bin byte frequency distributions, block entropy profiles, printable ASCII/UTF-8 extraction with classification (`URL`, `Path`, `Symbol`, `Format`).
+  - High-performance `BinaryDiff`: Byte delta chunks with side-by-side hex representation, section-level delta tracking, symbol addition/modification/removal analysis.
+  - Strictly Contained `CompilerExplorer`: POSIX `fork()`/`execvp()` isolated compilation with direct argument arrays, `-masm=intel`, assembler directive sanitization, pipe-based stderr capture, and millisecond execution timing.
+- [x] Native Daemon REST API Integration (`127.0.0.1:8080`):
+  - `POST /api/v1/binary/analyze`: Comprehensive multi-format binary analysis report.
+  - `POST /api/v1/binary/disassemble`: Capstone disassembly of raw/base64 opcode buffers.
+  - `POST /api/v1/binary/diff`: Two-binary differential comparator report.
+  - `POST /api/v1/compiler/compile`: Isolated C++ compilation to Intel-syntax assembly.
+- [x] Distributed Mesh Integration:
+  - Backward-compatible Protobuf schema update for `WORKLOAD_TYPE_BINARY_ANALYSIS` and `WORKLOAD_TYPE_COMPILER_EXPLORER`.
+  - Go worker executor validation update and Java scheduler allowlist update.
+- [x] GoGreen Studio UI Upgrade (`src/pages/BinaryLab/BinaryLabPage.tsx`):
+  - 9 Coherent industrial workspaces: Overview, Hex Intelligence, Format Structure, Capstone Disassembly, Symbols & Relocs, Binary Intelligence, Compiler Explorer, Binary Diff, and Analysis History.
+  - Live query integration with native daemon endpoints and graceful offline fallback.
+- [x] Automated Testing & Quality Gates:
+  - 100% Native unit tests passing (`test_asm_kernels`, `test_core_engine`, `test_binary_lab`).
+  - 100% Go worker unit & integration tests passing (`17/17`).
+  - 100% Frontend Vitest tests passing (`6/6`).
+  - Production TypeScript compilation (`tsc`) and Vite bundling passing.
+
+## Phase 5: Hardened Sandbox Isolation
 - [ ] Linux cgroups v2 + Seccomp-BPF runtime enforcement.
 - [ ] Windows AppContainer / Job Object sandboxing.

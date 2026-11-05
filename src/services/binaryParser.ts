@@ -458,3 +458,95 @@ export function generateSpecimenElf(): ArrayBuffer {
 
   return buf;
 }
+
+
+// -------------------------------------------------------------
+// GoGreen Native BinaryLab Daemon API Client (Phase 4)
+// -------------------------------------------------------------
+
+function uint8ArrayToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const len = bytes.byteLength;
+  for (let i = 0; i < len; i++) {
+    binary += String.fromCharCode(bytes[i] ?? 0);
+  }
+  return btoa(binary);
+}
+
+export async function analyzeBinaryViaDaemon(buffer: ArrayBuffer, fileName: string): Promise<any | null> {
+  const bytes = new Uint8Array(buffer);
+  const b64 = uint8ArrayToBase64(bytes);
+  try {
+    const res = await fetch('http://127.0.0.1:8080/api/v1/binary/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payload_base64: b64, filename: fileName }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function disassembleViaDaemon(
+  codeBytes: Uint8Array,
+  baseAddr = 0x1000
+): Promise<DisassemblyInstruction[] | null> {
+  const b64 = uint8ArrayToBase64(codeBytes);
+  try {
+    const res = await fetch('http://127.0.0.1:8080/api/v1/binary/disassemble', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code_base64: b64, base_address: baseAddr }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return data.map((d: any) => ({
+      address: `0x${d.address.toString(16).padStart(8, '0')}`,
+      bytes: d.bytes,
+      mnemonic: d.mnemonic,
+      operands: d.operands,
+      comment: d.symbol ? d.symbol : (d.is_call ? 'CALL' : d.is_ret ? 'RET' : undefined),
+    }));
+  } catch {
+    return null;
+  }
+}
+
+export async function diffBinariesViaDaemon(
+  bufA: ArrayBuffer, nameA: string,
+  bufB: ArrayBuffer, nameB: string
+): Promise<any | null> {
+  const b64A = uint8ArrayToBase64(new Uint8Array(bufA));
+  const b64B = uint8ArrayToBase64(new Uint8Array(bufB));
+  try {
+    const res = await fetch('http://127.0.0.1:8080/api/v1/binary/diff', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ file_a_base64: b64A, name_a: nameA, file_b_base64: b64B, name_b: nameB }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}
+
+export async function compileSourceViaDaemon(
+  sourceCode: string,
+  compiler = 'g++',
+  optimizationLevel = '-O2'
+): Promise<any | null> {
+  try {
+    const res = await fetch('http://127.0.0.1:8080/api/v1/compiler/compile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source_code: sourceCode, compiler, optimization_level: optimizationLevel }),
+    });
+    if (!res.ok) return null;
+    return await res.json();
+  } catch {
+    return null;
+  }
+}

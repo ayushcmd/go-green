@@ -23,7 +23,9 @@ public class SchedulerEngine {
     private static final Set<String> ALLOWED_WORKLOAD_TYPES = Set.of(
             "CPU_INFORMATION",
             "SYSTEM_TELEMETRY",
-            "NATIVE_BENCHMARK_SUITE"
+            "NATIVE_BENCHMARK_SUITE",
+            "BINARY_ANALYSIS",
+            "COMPILER_EXPLORER"
     );
 
     private final WorkerRepository workerRepository;

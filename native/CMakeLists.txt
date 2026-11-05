@@ -8,3 +8,4 @@ enable_testing()
 
 add_subdirectory(asm-kernels)
 add_subdirectory(core-engine)
+add_subdirectory(binary-lab)
