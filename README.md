@@ -340,4 +340,4 @@ go-green/
 **Academic / Institutional Email:** `ayush_24a12res897@iitp.ac.in`  
 **GitHub Repository:** [https://github.com/ayushcmd/go-green](https://github.com/ayushcmd/go-green)
 
-*Note: This repository is currently proprietary and all rights are reserved by the author. No formal open-source license has been granted at this time.*
+**License:** Original contributions controlled by the copyright holder are offered under the [Apache License, Version 2.0](LICENSE) for new distributions. Prior MIT licensing is documented in [LICENSES/MIT-previous.txt](LICENSES/MIT-previous.txt); third-party terms remain applicable. See [NOTICE](NOTICE).
